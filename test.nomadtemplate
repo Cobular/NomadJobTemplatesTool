@@ -1,0 +1,50 @@
+job "docker-registry-ui" {
+  datacenters = ["home"]
+  type        = "service"
+
+  update {
+    max_parallel      = 1
+    min_healthy_time  = "10s"
+    healthy_deadline  = "3m"
+    progress_deadline = "10m"
+    auto_revert       = true
+    canary            = 0
+  }
+
+  group "registry-ui" {
+    count = 1
+
+    network {
+      port "http" {
+        to = 80
+      }
+    }
+
+    task "registry-ui" {
+      driver = "docker"
+
+      config {
+        image = "joxit/docker-registry-ui:static"
+
+        ports = ["http"]
+      }
+
+      env {
+        REGISTRY_TITLE = "Jake's Docker Registry"
+        REGISTRY_URL   = "http://lenovo.h.jakecover.me:5000"
+      }
+
+      resources {
+        cpu    = 100
+        memory = 128
+      }
+    }
+
+    service {
+      name = "registry-ui"
+      port = "http"
+
+      {{ registry-ui }}
+    }
+  }
+}

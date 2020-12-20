@@ -22,30 +22,50 @@ def is_valid_file(parser, arg):
 parser = argparse.ArgumentParser(description="Insert template snippets into nomad jobs")
 parser.add_argument("filename", metavar="filename", type=lambda x: is_valid_file(parser, x),
                     help="The path to a nomad job template file")
-parser.add_argument("--norun", help="Just generates the nomad jobfile, does not run plan")
+parser.add_argument("--noplan", help="Just generates the nomad jobfile, does not run plan", action="store_true")
+parser.add_argument("--run", "-r", help="Just generates the nomad jobfile, does not run plan", action="store_true")
 args = parser.parse_args()
 
-regex_matcher = r"{{ ([\w-]+) }}"
+regex_matcher = r"{{ ([\w\-\.]+)\|*([\w\-\.]+)*\|*([\w\-\.]+)*\|*([\w\-\.]+)*\|*([\w\-\.]+)*\|*([\w\-\.]+)* }}"
 
 with open(args.filename.name, "r") as templateFile:
     template = templateFile.read()
-    service_name = re.findall(regex_matcher, template)[0]
+    matches = re.findall(regex_matcher, template)[0]
+    service_name = matches[0]
+    subdomain = matches[1] if matches[1] != "" else matches[0]
     if service_name is not None:
-        replacement = f"""
-        tags = [
-        "traefik.enable=true",
-        "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Job={service_name}",
-        "traefik.http.middlewares.{service_name}.headers.customresponseheaders.X-Task={service_name}",
-        "traefik.http.middlewares.{service_name}.headers.customresponseheaders.X-Service=http",
-        "traefik.http.routers.registry-ui.rule=Host(`{service_name}.jakecover.me`)",
-        "traefik.http.services.{service_name}.loadbalancer.sticky=true",
-        "traefik.tags=service",
-        "traefik.frontend.rule=Host:{service_name}.jakecover.me",
-        "traefik.http.middlewares.{service_name}-mid-ipwhitelist.ipwhitelist.sourcerange=192.168.0.1/16",
-        "traefik.http.routers.{service_name}.middlewares={service_name}-chain",
-        "traefik.http.middlewares.{service_name}-chain.chain.middlewares={service_name}-mid,{service_name}-mid-ipwhitelist"
-      ]
-        """
+        if ".h" in subdomain:
+            # Means we want this to be lan only
+            replacement = f"""
+            tags = [
+            "traefik.enable=true",
+            "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Job={service_name}",
+            "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Task={service_name}",
+            "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Service=http",
+            "traefik.http.routers.registry-ui.rule=Host(`{subdomain}.jakecover.me`)",
+            "traefik.http.services.{service_name}.loadbalancer.sticky=true",
+            "traefik.tags=service",
+            "traefik.frontend.rule=Host:{subdomain}.jakecover.me",
+            "traefik.http.middlewares.{service_name}-mid-ipwhitelist.ipwhitelist.sourcerange=192.168.0.1/16",
+            "traefik.http.routers.{service_name}.middlewares={service_name}-chain",
+            "traefik.http.middlewares.{service_name}-chain.chain.middlewares={service_name}-mid,{service_name}-mid-ipwhitelist"
+          ]
+            """
+        else:
+            # This should be public
+            replacement = f"""
+                        tags = [
+                        "traefik.enable=true",
+                        "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Job={service_name}",
+                        "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Task={service_name}",
+                        "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Service=http",
+                        "traefik.http.routers.registry-ui.rule=Host(`{subdomain}.jakecover.me`)",
+                        "traefik.http.services.{service_name}.loadbalancer.sticky=true",
+                        "traefik.tags=service",
+                        "traefik.frontend.rule=Host:{subdomain}.jakecover.me",
+                        "traefik.http.routers.{service_name}.middlewares={service_name}-mid",
+                      ]
+                        """
         output = re.sub(regex_matcher, replacement, template)
         print(service_name)
     else:

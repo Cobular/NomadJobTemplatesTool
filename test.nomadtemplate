@@ -44,7 +44,7 @@ job "docker-registry-ui" {
       name = "registry-ui"
       port = "http"
 
-      {{ registry-ui }}
+      {{ registry-ui|registry-ui.h }}
     }
   }
 }

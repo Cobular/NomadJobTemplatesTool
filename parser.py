@@ -54,9 +54,9 @@ with open(args.filename.name, "r") as templateFile:
     with open(os.path.splitext(args.filename.name)[0] + ".nomad", "w") as outputFile:
         outputFile.write(output)
 
-    print("----------------------------\nFile Translated\n----------------------------")
+    print("----------------------------\nPlanning Job\n----------------------------")
 
-    if not args.norun:
+    if not args.noplan:
         plan_results = subprocess.run(
             ["nomad", "job", "plan", os.path.abspath(os.path.splitext(args.filename.name)[0] + ".nomad")],
             capture_output=True, text=True)
@@ -64,3 +64,16 @@ with open(args.filename.name, "r") as templateFile:
             print(plan_results.stderr)
             raise RuntimeError("The planning failed! See results")
         print(plan_results.stdout)
+
+        if args.run:
+            print("----------------------------\nRunning Job\n----------------------------")
+            command = None
+            for line in plan_results.stdout.split("\n"):
+                if re.match(r"nomad job run -check-index", line):
+                    command = line
+            if command is not None:
+                run_results = subprocess.run(command)
+                print(run_results.stdout)
+                print(run_results.stderr)
+            else:
+                raise RuntimeError("Could not find a command in the plan response!")

@@ -1,10 +1,13 @@
 import argparse
 import os
 import re
+import subprocess
+
 
 class VariableNotFound(Exception):
     """Raised when the template variable {{  }} is not found."""
     pass
+
 
 def is_valid_file(parser, arg):
     if not os.path.exists(arg):
@@ -19,6 +22,7 @@ def is_valid_file(parser, arg):
 parser = argparse.ArgumentParser(description="Insert template snippets into nomad jobs")
 parser.add_argument("filename", metavar="filename", type=lambda x: is_valid_file(parser, x),
                     help="The path to a nomad job template file")
+parser.add_argument("--norun", help="Just generates the nomad jobfile, does not run plan")
 args = parser.parse_args()
 
 regex_matcher = r"{{ ([\w-]+) }}"
@@ -49,3 +53,14 @@ with open(args.filename.name, "r") as templateFile:
 
     with open(os.path.splitext(args.filename.name)[0] + ".nomad", "w") as outputFile:
         outputFile.write(output)
+
+    print("----------------------------\nFile Translated\n----------------------------")
+
+    if not args.norun:
+        plan_results = subprocess.run(
+            ["nomad", "job", "plan", os.path.abspath(os.path.splitext(args.filename.name)[0] + ".nomad")],
+            capture_output=True, text=True)
+        if plan_results.returncode != 0:
+            print(plan_results.stderr)
+            raise RuntimeError("The planning failed! See results")
+        print(plan_results.stdout)

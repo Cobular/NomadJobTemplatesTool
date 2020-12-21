@@ -42,29 +42,40 @@ with open(args.filename.name, "r") as templateFile:
             "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Job={service_name}",
             "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Task={service_name}",
             "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Service=http",
-            "traefik.http.routers.registry-ui.rule=Host(`{subdomain}.jakecover.me`)",
+            "traefik.http.routers.{service_name}.rule=Host(`{subdomain}.jakecover.me`)",
             "traefik.http.services.{service_name}.loadbalancer.sticky=true",
             "traefik.tags=service",
             "traefik.frontend.rule=Host:{subdomain}.jakecover.me",
             "traefik.http.middlewares.{service_name}-mid-ipwhitelist.ipwhitelist.sourcerange=192.168.0.1/16",
             "traefik.http.routers.{service_name}.middlewares={service_name}-chain",
-            "traefik.http.middlewares.{service_name}-chain.chain.middlewares={service_name}-mid,{service_name}-mid-ipwhitelist"
+            "traefik.http.middlewares.{service_name}-chain.chain.middlewares={service_name}-mid,{service_name}-mid-ipwhitelist",
+            "traefik.http.routers.{service_name}.entrypoints=https",
+            "traefik.http.routers.{service_name}.tls.certresolver=certResolver",
+            "traefik.http.routers.{service_name}-http.entrypoints=http",
+            "traefik.http.routers.{service_name}-http.rule=Host(`{subdomain}.jakecover.me`)",
+            "traefik.http.middlewares.{service_name}-chain-http.chain.middlewares=redirect-to-https@file,{service_name}-mid-ipwhitelist",
+            "traefik.http.routers.{service_name}-http.middlewares={service_name}-chain-http"
           ]
             """
         else:
             # This should be public
             replacement = f"""
                         tags = [
-                        "traefik.enable=true",
-                        "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Job={service_name}",
-                        "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Task={service_name}",
-                        "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Service=http",
-                        "traefik.http.routers.registry-ui.rule=Host(`{subdomain}.jakecover.me`)",
-                        "traefik.http.services.{service_name}.loadbalancer.sticky=true",
-                        "traefik.tags=service",
-                        "traefik.frontend.rule=Host:{subdomain}.jakecover.me",
-                        "traefik.http.routers.{service_name}.middlewares={service_name}-mid",
-                      ]
+                            "traefik.enable=true",
+                            "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Job={service_name}",
+                            "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Task={service_name}",
+                            "traefik.http.middlewares.{service_name}-mid.headers.customresponseheaders.X-Service=http",
+                            "traefik.http.routers.{service_name}.rule=Host(`{subdomain}.jakecover.me`)",
+                            "traefik.http.services.{service_name}.loadbalancer.sticky=true",
+                            "traefik.tags=service",
+                            "traefik.frontend.rule=Host:{subdomain}.jakecover.me",
+                            "traefik.http.routers.{service_name}.middlewares={service_name}-mid",
+                            "traefik.http.routers.{service_name}.entrypoints=https",
+                            "traefik.http.routers.{service_name}.tls.certresolver=certResolver",
+                            "traefik.http.routers.{service_name}-http.entrypoints=http",
+                            "traefik.http.routers.{service_name}-http.rule=Host(`{subdomain}.jakecover.me`)",
+                            "traefik.http.routers.{service_name}-http.middlewares=redirect-to-https@file"
+                        ]
                         """
         output = re.sub(regex_matcher, replacement, template)
         print(service_name)
@@ -78,8 +89,7 @@ with open(args.filename.name, "r") as templateFile:
 
     if not args.noplan:
         plan_results = subprocess.run(
-            ["nomad", "job", "plan", os.path.abspath(os.path.splitext(args.filename.name)[0] + ".nomad")],
-            capture_output=True, text=True)
+            ["nomad", "job", "plan", os.path.abspath(os.path.splitext(args.filename.name)[0] + ".nomad")])
         if plan_results.returncode != 0:
             print(plan_results.stderr)
             raise RuntimeError("The planning failed! See results")
